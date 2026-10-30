@@ -19,9 +19,9 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "22" }
       - run: npm ci
 
       - name: Pull Notion → links.json
@@ -53,9 +53,9 @@ jobs:
     if: always()                       # click counts still update if the sync failed
     continue-on-error: true            # never let analytics break the pipeline
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "22" }
       - run: npm ci
       - name: Roll up clicks → Notion
         env:

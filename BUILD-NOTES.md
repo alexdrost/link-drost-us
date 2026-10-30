@@ -17,7 +17,7 @@ Built 2026-10-30 in a cloud session that **could not reach `api.notion.com`, `ap
 
 | Item | Status | What unblocks it |
 |---|---|---|
-| GitHub repo | **Not created.** The session can't create repos. Code is committed locally only. | Alex creates an empty private repo `alexdrost/link-drost-us`; then it's attached and pushed. |
+| GitHub repo | **Done.** Alex created `alexdrost/link-drost-us`; code pushed to `main`. The first push-triggered run failed in both jobs with exit 1 within seconds — consistent with the scripts' missing-secret check, but the job logs weren't readable from the build session, so the cause is unconfirmed. | Set the secrets, then re-run. |
 | Actions secrets | **Not set.** No token values were available. | Alex adds the 4 secrets (README → Setup). |
 | Notion integration sharing | **Not done.** Can't be done via API. | Database ⋯ → Connections → add the integration that owns `NOTION_TOKEN`. |
 | Notion sync button | **Not created.** Notion's API can't create button blocks. A plain link to the workflow is at the top of the page instead. | Optional: `/button` → Open link (README → Sync button). |
@@ -52,19 +52,26 @@ Built 2026-10-30 in a cloud session that **could not reach `api.notion.com`, `ap
 
    The three queries are also shaped slightly differently from §9's text. Each slug has its own `Counted through`, so the accumulation query isn't one global lower bound with one sum. It runs once from the earliest pending date (clamped to the 90-day retention floor), grouped by `slug, toStartOfInterval(timestamp, INTERVAL '1' DAY)`, upper-bounded at today 00:00 UTC. Each slug then sums only its own days. It's still 3 queries per night.
 
-5. **§7 `RESERVED`: extensionless asset paths were missing.** With `html_handling`, the asset layer also answers `/gone`, `/404` and `/index`. Without reserving them, a request to `/gone` fell through as an unknown slug and served the expired page with a 200. I added `"404", "gone", "index"` to `RESERVED`, so those names can't be used as slugs either.
+5. **§4 / §11 Node version: Node 20 reached end-of-life in April 2026.** The first Actions run warned that `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 and are being forced onto Node 24. The workflow now uses `checkout@v5`, `setup-node@v5` and `node-version: "22"`; `package.json` engines is `>=22`.
+   Replace in §4: "Node 20+." with:
+   > Node 22+.
 
-6. **§7 worker: `decodeURIComponent` throws on a malformed escape** (`/%E0%A4%A`), which would make the request fail with a 500. It is now wrapped, so the raw path is used and resolves to a 404. Also, `data.links[slug]` was looked up with `Object.hasOwn`, so `/__proto__` and `/constructor` can't match inherited properties. Both 404 (tested).
+   Replace in §11, in both jobs:
+   > `actions/checkout@v5`, `actions/setup-node@v5`, `with: { node-version: "22" }`
 
-7. **§4 "Create exactly this": one added file, `src/shared.js`.** HOST, the slug regex, RESERVED and OWN_DOMAINS each appear in the Worker, the sync and QA. One shared module stops the three copies from drifting apart, which is itself a guardrail. No new directories were added.
+6. **§7 `RESERVED`: extensionless asset paths were missing.** With `html_handling`, the asset layer also answers `/gone`, `/404` and `/index`. Without reserving them, a request to `/gone` fell through as an unknown slug and served the expired page with a 200. I added `"404", "gone", "index"` to `RESERVED`, so those names can't be used as slugs either.
 
-8. **Verified as the handoff states (no change needed):**
+7. **§7 worker: `decodeURIComponent` throws on a malformed escape** (`/%E0%A4%A`), which would make the request fail with a 500. It is now wrapped, so the raw path is used and resolves to a 404. Also, `data.links[slug]` was looked up with `Object.hasOwn`, so `/__proto__` and `/constructor` can't match inherited properties. Both 404 (tested).
+
+8. **§4 "Create exactly this": one added file, `src/shared.js`.** HOST, the slug regex, RESERVED and OWN_DOMAINS each appear in the Worker, the sync and QA. One shared module stops the three copies from drifting apart, which is itself a guardrail. No new directories were added.
+
+9. **Verified as the handoff states (no change needed):**
    - `run_worker_first: true`. Checked against the wrangler 4.156 config schema; it accepts a boolean or an array of patterns.
    - Analytics Engine SQL endpoint `/accounts/{id}/analytics_engine/sql`, raw-SQL body, mandatory lower time bound, `SUM(_sample_interval)`.
    - `env.ASSETS.fetch(new URL("/gone.html", url))` returns the page body under `drop-trailing-slash`. I suspected a 307 here, tested it, and found the handoff's line is correct. It is kept as written.
    - Notion API version `2022-06-28` and `/v1/databases/{id}/query`. **Not verifiable from this sandbox.** The database was created through Notion's current tooling, which uses the data-sources model; it has exactly one data source (`a52d6c3d-de76-4d2b-ac94-4f795f9ff3fc`), so the classic endpoint should work against the database ID. If the first run fails on this, switch to `Notion-Version: 2025-09-03` and `POST /v1/data_sources/a52d6c3d-de76-4d2b-ac94-4f795f9ff3fc/query`. The property shapes are unchanged.
 
-9. **Other implementation calls, not in the handoff:**
+10. **Other implementation calls, not in the handoff:**
    - A retired slug whose Notion row is **deleted** is carried forward from the previous `links.json`, with a warning, so it keeps serving 410. QA also fails if a ledger slug is missing from `links.json`.
    - A retired slug set back to **Draft** aborts the sync, the same as setting it to Active. Draft would silently turn the 410 into a 404.
    - Slugs are **not** silently lowercased by the sync. An uppercase slug in Notion aborts with a clear message, which is fail-closed. Requests are case-insensitive, as specified.
