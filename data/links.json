@@ -1,9 +1,17 @@
 {
-  "generated": "1970-01-01T00:00:00Z",
+  "generated": "2026-10-30T19:06:52Z",
   "source": "notion",
   "count": {
-    "active": 0,
+    "active": 1,
     "retired": 0
   },
-  "links": {}
+  "links": {
+    "boa": {
+      "to": "https://thebusinessofaccounting.com/",
+      "code": 302,
+      "status": "active",
+      "label": "The Business of Accounting",
+      "tree": true
+    }
+  }
 }
