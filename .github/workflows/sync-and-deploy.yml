@@ -1,0 +1,66 @@
+name: sync-and-deploy
+
+on:
+  schedule:
+    - cron: "0 5 * * *"      # 05:00 UTC ≈ midnight US Eastern
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["src/**", "public/**", "tools/**", "wrangler.jsonc"]
+
+concurrency:
+  group: shortlinks
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+
+      - name: Pull Notion → links.json
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: node tools/sync-from-notion.mjs
+
+      - name: QA
+        run: node tools/qa.mjs --links
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "shortlink-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/links.json data/retired.json public/index.html
+          git diff --staged --quiet || git commit -m "sync: links from Notion"
+          git push
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+  rollup:
+    runs-on: ubuntu-latest
+    needs: sync
+    if: always()                       # click counts still update if the sync failed
+    continue-on-error: true            # never let analytics break the pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - name: Roll up clicks → Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node tools/rollup-clicks.mjs
